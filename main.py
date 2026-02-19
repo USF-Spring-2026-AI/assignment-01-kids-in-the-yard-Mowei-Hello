@@ -8,6 +8,7 @@ def display_menu():
     print("(T)otal number of people in the tree")
     print("Total number of people in the tree by (D)ecade")
     print("(N)ames duplicated")
+    print("Total number of people (A)live in each decade")
     print("(Q)uit")
 
 
@@ -29,7 +30,7 @@ def show_by_decade(tree: FamilyTree):
     Args:
         tree: FamilyTree instance to query
     """
-    decade_counts = tree.get_count_by_decade()
+    decade_counts = tree.get_birth_count_by_decade()
 
     # Sort decades chronologically
     sorted_decades = sorted(decade_counts.keys())
@@ -38,6 +39,21 @@ def show_by_decade(tree: FamilyTree):
         count = decade_counts[decade]
         print(f"{decade}: {count}")
 
+def show_alive_by_decade(tree: FamilyTree):
+    """
+    Display the number of people alive in each decade.
+
+    Args:
+        tree: FamilyTree instance to query
+    """
+    alive_counts = tree.get_alive_count_by_decade()
+
+    # Sort decades chronologically
+    sorted_decades = sorted(alive_counts.keys())
+
+    for decade in sorted_decades:
+        count = alive_counts[decade]
+        print(f"{decade}: {count}")
 
 def show_duplicates(tree: FamilyTree):
     """
@@ -66,10 +82,10 @@ def get_user_input() -> str:
     while True:
         user_input = input("> ").strip().upper()
 
-        if user_input in ['T', 'D', 'N', 'Q']:
+        if user_input in ['T', 'D', 'N', 'A', 'Q']:
             return user_input
         else:
-            print("Invalid input. Please enter T, D, N, or Q.")
+            print("Invalid input. Please enter T, D, N, A, or Q.")
 
 
 def main():
@@ -93,6 +109,8 @@ def main():
             show_by_decade(tree)
         elif choice == 'N':
             show_duplicates(tree)
+        elif choice == 'A':
+            show_alive_by_decade(tree)
         elif choice == 'Q':
             print("Exiting...")
             break

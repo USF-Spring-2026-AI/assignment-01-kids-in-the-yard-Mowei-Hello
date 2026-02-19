@@ -1,7 +1,7 @@
 from collections import deque
 import math
 import random
-from typing import List
+from typing import Dict, List
 from person import Person
 from person_factory import PersonFactory
 from utils import get_decade_string
@@ -16,7 +16,8 @@ class FamilyTree:
         original_person1: First person born in 1950
         original_person2: Second person born in 1950
         all_people: List of all Person objects in the tree
-        people_by_decade: Dictionary organizing people by birth decade
+        people_by_birth_decade: Dictionary organizing people by birth decade
+        people_alive_by_decade: Dictionary organizing people alive in each decade
     """
 
     def __init__(self, factory: PersonFactory):
@@ -30,7 +31,8 @@ class FamilyTree:
         self.original_person1 = None
         self.original_person2 = None
         self.all_people = []
-        self.people_by_decade = {}
+        self.people_by_birth_decade: Dict[str, List[Person]] = {}
+        self.people_alive_by_decade: Dict[str, List[Person]] = {}
 
         # Initialize the two original people born in 1950
         self._initialize_original_people()
@@ -79,10 +81,10 @@ class FamilyTree:
         """
         decade = get_decade_string(person.get_year_born())
 
-        if decade not in self.people_by_decade:
-            self.people_by_decade[decade] = []
+        if decade not in self.people_by_birth_decade:
+            self.people_by_birth_decade[decade] = []
 
-        self.people_by_decade[decade].append(person)
+        self.people_by_birth_decade[decade].append(person)
 
     def add_person(self, person: Person):
         """
@@ -154,6 +156,26 @@ class FamilyTree:
             birth_years = [int(start_year + i * step) for i in range(num_children)]
 
         return birth_years
+    
+    def build_people_alive_by_decade(self):
+        """
+        Build the people_alive_by_decade dictionary to track which people are alive in each decade.
+        This is called after the tree is fully generated.
+        Format: {decade_string: [Person objects]}
+        """
+        for person in self.all_people:
+            birth_decade = get_decade_string(person.get_year_born())
+            death_decade = get_decade_string(person.get_year_died())
+
+            # Get all decades from birth to death (inclusive)
+            birth_decade_num = int(birth_decade[:-1])  # Remove 's' and convert to int
+            death_decade_num = int(death_decade[:-1])
+
+            for decade_num in range(birth_decade_num, death_decade_num + 10, 10): # Iterate through each decade from birth to death
+                decade_str = f"{decade_num}s"
+                if decade_str not in self.people_alive_by_decade:
+                    self.people_alive_by_decade[decade_str] = []
+                self.people_alive_by_decade[decade_str].append(person)
 
     def generate_tree(self):
         """
@@ -247,6 +269,9 @@ class FamilyTree:
                 # Add child to queue for further processing
                 queue.append(child)
 
+        # After generating the tree, build the people_alive_by_decade dictionary for later queries
+        self.build_people_alive_by_decade()
+
     def get_total_count(self) -> int:
         """
         Get the total number of people in the tree.
@@ -256,7 +281,7 @@ class FamilyTree:
         """
         return len(self.all_people)
 
-    def get_count_by_decade(self):
+    def get_birth_count_by_decade(self):
         """
         Get the count of people born in each decade.
 
@@ -265,10 +290,24 @@ class FamilyTree:
         """
         decade_counts = {}
 
-        for decade, people in self.people_by_decade.items():
+        for decade, people in self.people_by_birth_decade.items():
             decade_counts[decade] = len(people)
 
         return decade_counts
+    
+    def get_alive_count_by_decade(self):
+        """
+        Get the count of people alive in each decade.
+
+        Returns:
+            Dictionary mapping decade to count {decade: count}
+        """
+        alive_counts = {}
+
+        for decade, people in self.people_alive_by_decade.items():
+            alive_counts[decade] = len(people)
+
+        return alive_counts
 
     def find_duplicate_names(self) -> List[str]:
         """

@@ -94,32 +94,3 @@ class Person:
         """Add a child to the person's list of children."""
         self._children.append(child)
 
-    # def is_descendant_of(self, ancestor1: 'Person', ancestor2: 'Person') -> bool:
-    #     """
-    #     Check if this person is a descendant of the two given ancestors.
-
-    #     Args:
-    #         ancestor1: First original ancestor
-    #         ancestor2: Second original ancestor
-
-    #     Returns:
-    #         True if this person is descended from either ancestor, False otherwise
-    #     """
-    #     if self._parents is None:
-    #         # This person has no parents, so they are not a descendant
-    #         return False
-
-    #     # Check if either parent is one of the original ancestors
-    #     parent1, parent2 = self._parents
-    #     if parent1 == ancestor1 or parent1 == ancestor2:
-    #         return True
-    #     if parent2 is not None and (parent2 == ancestor1 or parent2 == ancestor2):
-    #         return True
-
-    #     # Recursively check parents
-    #     is_desc_parent1 = parent1.is_descendant_of(ancestor1, ancestor2)
-    #     is_desc_parent2 = False
-    #     if parent2 is not None:
-    #         is_desc_parent2 = parent2.is_descendant_of(ancestor1, ancestor2)
-
-    #     return is_desc_parent1 or is_desc_parent2

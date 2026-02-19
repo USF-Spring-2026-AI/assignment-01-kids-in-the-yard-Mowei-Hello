@@ -1,10 +1,3 @@
-"""
-Utility Functions
-CS 362/562 - Assignment 1
-Shared helper functions used across multiple modules.
-"""
-
-
 def get_decade_string(year: int) -> str:
     """
     Convert a year to its decade string representation.
