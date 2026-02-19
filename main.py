@@ -8,6 +8,7 @@ def display_menu():
     print("(T)otal number of people in the tree")
     print("Total number of people in the tree by (D)ecade")
     print("(N)ames duplicated")
+    print("(Q)uit")
 
 
 def show_total(tree: FamilyTree):

@@ -1,6 +1,7 @@
 import random
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple
 from person import Person
+from utils import get_decade_string
 
 
 class PersonFactory:
@@ -11,19 +12,20 @@ class PersonFactory:
         life_expectancy: Dictionary mapping year to life expectancy
         first_names: Nested dictionary of first names by decade and gender
         gender_probability: Dictionary mapping decade to probability of gendered name
-        last_names: List of (last_name, rank) tuples
+        last_names: Nested dictionary of last names by decade and rank
         rank_probabilities: List of probabilities corresponding to ranks 1-30
         birth_marriage_rates: Dictionary of birth and marriage rates by decade
     """
 
     def __init__(self):
         """Initialize the PersonFactory with empty data structures."""
-        self.life_expectancy = {}
-        self.first_names = {}
-        self.gender_probability = {}
-        self.last_names = []
-        self.rank_probabilities = []
-        self.birth_marriage_rates = {}
+        self.life_expectancy: Dict[int, float] = {}
+        self.first_names: Dict[str, Dict[str, Dict[str, float]]] = {}
+        self.gender_probability: Dict[str, Dict[str, float]] = {} # Extra requirement for grad student
+        self.last_names: Dict[str, Dict[str, int]] = {}
+        self.rank_probabilities: Dict[int, float] = {}
+        self.birth_marriage_rates: Dict[str, Dict[str, float]] = {}
+        self.last_names_with_frequencies: Dict[str, Dict[str, float]] = {} # convenience structure for last name selection
 
     def read_files(self):
         """Read all data files needed for person generation."""
@@ -33,6 +35,9 @@ class PersonFactory:
         self.read_last_names()
         self.read_rank_to_probability()
         self.read_birth_marriage_rates()
+        self.build_last_names_with_frequencies()
+
+###################### File reading methods ######################
 
     def read_life_expectancy(self):
         """
@@ -40,9 +45,7 @@ class PersonFactory:
         Format: {year: life_expectancy}
         """
         with open('life_expectancy.csv') as file:
-            # Skip header line
-            file.readline()
-
+            file.readline() # Skip header line
             for line in file:
                 line = line.rstrip()
                 if line:  # Skip empty lines
@@ -54,45 +57,40 @@ class PersonFactory:
     def read_first_names(self):
         """
         Read first_names.csv and store in nested dictionary.
-        Format: {decade: {gender: [(name, frequency), ...]}}
+        Format: {decade: {gender: {name: frequency, ...}}}
         """
         with open('first_names.csv') as file:
-            # Skip header line
-            file.readline()
-
+            file.readline() # Skip header line
             for line in file:
                 line = line.rstrip()
                 if line:  # Skip empty lines
                     parts = line.split(',')
-                    decade = parts[0]  # e.g., "1950s"
-                    gender = parts[1]  # "male" or "female"
+                    decade = parts[0]  
+                    gender = parts[1]
                     name = parts[2]
                     frequency = float(parts[3])
 
-                    # Initialize nested dictionaries if needed
+                    # Initialize nested dictionaries if empty
                     if decade not in self.first_names:
                         self.first_names[decade] = {}
                     if gender not in self.first_names[decade]:
-                        self.first_names[decade][gender] = []
+                        self.first_names[decade][gender] = {}
 
-                    # Append (name, frequency) tuple
-                    self.first_names[decade][gender].append((name, frequency))
+                    self.first_names[decade][gender][name] = frequency # Assuming a gendered name can only have one frequency per decade
 
     def read_gender_probability(self):
         """
-        Read gender_name_probability.csv and store in dictionary.
+        Extra requirement for grad student: read gender_name_probability.csv and store in dictionary.
         Format: {decade: {gender: probability}}
         """
         with open('gender_name_probability.csv') as file:
-            # Skip header line
-            file.readline()
-
+            file.readline() # Skip header line
             for line in file:
                 line = line.rstrip()
                 if line:  # Skip empty lines
                     parts = line.split(',')
-                    decade = parts[0]  # e.g., "1950s"
-                    gender = parts[1]  # "male" or "female"
+                    decade = parts[0]
+                    gender = parts[1]
                     probability = float(parts[2])
 
                     # Initialize nested dictionary if needed
@@ -103,34 +101,38 @@ class PersonFactory:
 
     def read_last_names(self):
         """
-        Read last_names.csv and store as list of (last_name, rank) tuples.
-        Format: Decade,Rank,LastName
+        Read last_names.csv and store in nested dictionary.
+        Format: {decade: {name: rank, ...}}
         """
         with open('last_names.csv') as file:
-            # Skip header line
-            file.readline()
-
+            file.readline() # Skip header line
             for line in file:
                 line = line.rstrip()
                 if line:  # Skip empty lines
                     parts = line.split(',')
-                    # Extract: Decade, Rank, LastName
+                    decade = parts[0] 
                     rank = int(parts[1])
                     last_name = parts[2]
-                    self.last_names.append((last_name, rank))
+
+                    if decade not in self.last_names:
+                        self.last_names[decade] = {}
+
+                    self.last_names[decade][last_name] = rank # Assuming a last name can only have one rank per decade
 
     def read_rank_to_probability(self):
         """
-        Read rank_to_probability.csv and store as list.
-        The CSV contains probabilities for ranks 1-30 in a single row.
+        Read rank_to_probability.csv and store as dictionary.
+        Format: {rank: probability}
         """
         with open('rank_to_probability.csv') as file:
-            # Read the first line which contains all probabilities
+            # Read the first and only line
             line = file.readline().rstrip()
             if line:
                 # Split by comma to get individual probabilities
                 prob_strings = line.split(',')
-                self.rank_probabilities = [float(prob) for prob in prob_strings]
+
+                # Convert to float and store in dictionary, with index+1 as rank (rank 1 = index 0)
+                self.rank_probabilities = {i + 1: float(prob_str) for i, prob_str in enumerate(prob_strings)}
 
     def read_birth_marriage_rates(self):
         """
@@ -138,14 +140,12 @@ class PersonFactory:
         Format: {decade: {'birth_rate': float, 'marriage_rate': float}}
         """
         with open('birth_and_marriage_rates.csv') as file:
-            # Skip header line
-            file.readline()
-
+            file.readline() # Skip header line
             for line in file:
                 line = line.rstrip()
                 if line:  # Skip empty lines
                     parts = line.split(',')
-                    decade = parts[0]  # e.g., "1950s"
+                    decade = parts[0]
                     birth_rate = float(parts[1])
                     marriage_rate = float(parts[2])
 
@@ -153,6 +153,18 @@ class PersonFactory:
                         'birth_rate': birth_rate,
                         'marriage_rate': marriage_rate
                     }
+    
+    def build_last_names_with_frequencies(self):
+        """
+        Build a nested dictionary of last names with their corresponding probabilities based on rank.
+        Format: {decade: {last_name: probability, ...}}
+        """
+        for decade, names_with_ranks in self.last_names.items():
+            self.last_names_with_frequencies[decade] = {}
+            for name, rank in names_with_ranks.items():
+                self.last_names_with_frequencies[decade][name] = self.rank_probabilities[rank]
+
+###################### Person attribute methods ######################
 
     def get_year_died(self, year_born: int) -> int:
         """
@@ -160,21 +172,16 @@ class PersonFactory:
 
         Args:
             year_born: The year the person was born
-
         Returns:
             The year the person died (life expectancy +/- 10 years)
         """
-        # Get life expectancy for the birth year
-        if year_born in self.life_expectancy:
-            expectancy = self.life_expectancy[year_born]
-        else:
-            # If exact year not found, use closest available year
-            closest_year = min(self.life_expectancy.keys(), key=lambda x: abs(x - year_born))
-            expectancy = self.life_expectancy[closest_year]
+        # Get life expectancy for the birth year, rounded down to the integer year
+        lookup_year = min(year_born, 2120) # Assuming life expectancy data goes up to 2120, since a partner could be born up to 10 years after the last birth year of 2120
+        expectancy = int(self.life_expectancy[lookup_year])
 
         # Add random variation of +/- 10 years
         variation = random.randint(-10, 10)
-        years_lived = int(expectancy) + variation
+        years_lived = expectancy + variation
 
         return year_born + years_lived
 
@@ -185,78 +192,67 @@ class PersonFactory:
         Args:
             year_born: The year the person was born
             gender: The person's gender ('male' or 'female')
-
         Returns:
             A randomly selected first name based on frequency distributions
         """
-        # Determine the decade
-        decade_num = (year_born // 10) * 10
-        decade = f"{decade_num}s"
+        decade = get_decade_string(year_born)
+        names_with_freq = self.first_names[decade][gender]
 
-        # For CS 562: Use gender probability to determine if should use gendered name
-        # The probability indicates likelihood of using a name matching their gender
-        if decade in self.gender_probability and gender in self.gender_probability[decade]:
-            use_gendered = random.random() < self.gender_probability[decade][gender]
-        else:
-            use_gendered = True
+        # Extract names and frequencies as lists for random.choices
+        names = list(names_with_freq.keys())
+        frequencies = list(names_with_freq.values())
 
-        # Get names for this decade and gender
-        if use_gendered and decade in self.first_names and gender in self.first_names[decade]:
-            names_with_freq = self.first_names[decade][gender]
-        elif not use_gendered and decade in self.first_names:
-            # Use opposite gender name
-            opposite_gender = "female" if gender == "male" else "male"
-            if opposite_gender in self.first_names[decade]:
-                names_with_freq = self.first_names[decade][opposite_gender]
-            else:
-                # Fallback to own gender if opposite not available
-                names_with_freq = self.first_names[decade].get(gender, [("Alex", 1.0)])
-        else:
-            # Fallback to 1950s if decade not found
-            names_with_freq = self.first_names.get("1950s", {}).get(gender, [("John", 1.0)])
+        return random.choices(names, weights=frequencies)[0]
 
-        # Extract names and frequencies
-        names = [name for name, freq in names_with_freq]
-        frequencies = [freq for name, freq in names_with_freq]
-
-        # Select a name based on weighted probabilities
-        selected_name = random.choices(names, weights=frequencies, k=1)[0]
-
-        return selected_name
-
-    def get_last_name(self, is_descendant: bool, original_last_names: List[str]) -> str:
+    def get_last_name(self, year_born: int, is_descendant: bool,
+                     original_last_names: List[str]) -> str:
         """
-        Select a last name based on descendant status.
+        Select a last name based on descendant status and birth decade.
 
         Args:
+            year_born: Year the person was born
             is_descendant: True if person is descended from original two people
             original_last_names: List of last names from the original ancestors
-
         Returns:
             A last name
         """
         if is_descendant:
             # Randomly choose from original last names
             return random.choice(original_last_names)
-        else:
-            # Use rank probabilities to select from last_names list
-            # Only use first 30 names (matching rank_probabilities length)
-            available_names = self.last_names[:min(30, len(self.last_names))]
 
-            # Extract last names
-            names = [name for name, rank in available_names]
+        decade = get_decade_string(year_born)
+        names_with_frequencies = self.last_names_with_frequencies[decade]
 
-            # Use rank probabilities as weights
-            weights = self.rank_probabilities[:len(available_names)]
+        names = list(names_with_frequencies.keys())
+        weights = list(names_with_frequencies.values())
 
-            # Select based on probability
-            selected_name = random.choices(names, weights=weights, k=1)[0]
+        return random.choices(names, weights=weights)[0]
 
-            return selected_name
+    def assign_gender(self, year_born: int) -> str:
+        """
+        Extra requirement for grad student: assign a gender based on gender probabilities by decade.
 
+        Args:
+            year_born: The year the person was born
+
+        Returns:
+            A gender ('male' or 'female') based on probabilities for the birth decade
+        """
+        decade = get_decade_string(year_born)
+
+        # Use the gender probability for this decade
+        gender_probs = self.gender_probability[decade]
+
+        genders = list(gender_probs.keys())
+        probabilities = list(gender_probs.values())
+        return random.choices(genders, weights=probabilities)[0]
+
+
+###################### Person creation methods ######################
+        
     def create_person(self, year_born: int, gender: str, is_descendant: bool,
                      original_last_names: List[str],
-                     parents: Optional[Tuple[Person, Person]] = None) -> Person:
+                     parents: Tuple[Person, Person] | None = None) -> Person:
         """
         Create a new Person instance with all attributes generated.
 
@@ -272,9 +268,9 @@ class PersonFactory:
         """
         year_died = self.get_year_died(year_born)
         first_name = self.get_first_name(year_born, gender)
-        last_name = self.get_last_name(is_descendant, original_last_names)
+        last_name = self.get_last_name(year_born, is_descendant, original_last_names)
 
-        person = Person(year_born, first_name, last_name, gender, year_died, parents)
+        person = Person(year_born, year_died, first_name, last_name, gender, parents)
 
         return person
 
@@ -288,18 +284,10 @@ class PersonFactory:
         Returns:
             True if person should have a partner, False otherwise
         """
-        # Determine the decade
-        decade_num = (year_born // 10) * 10
-        decade = f"{decade_num}s"
+        decade = get_decade_string(year_born)
+        marriage_rate = self.birth_marriage_rates[decade]['marriage_rate']
 
-        # Get marriage rate for this decade
-        if decade in self.birth_marriage_rates:
-            marriage_rate = self.birth_marriage_rates[decade]['marriage_rate']
-        else:
-            # Default to 0.5 if decade not found
-            marriage_rate = 0.5
-
-        # Random decision based on marriage rate
+        # boolean decision based on marriage rate, reference: https://stackoverflow.com/questions/5886987/true-or-false-output-based-on-a-probability
         return random.random() < marriage_rate
 
     def create_partner(self, person: Person, is_descendant: bool,
@@ -318,14 +306,13 @@ class PersonFactory:
         # Partner's birth year is within +/- 10 years
         partner_year_born = person.get_year_born() + random.randint(-10, 10)
 
-        # Partner has opposite gender (for simplicity)
-        partner_gender = "female" if person.get_gender() == "male" else "male"
+        # Partner's gender is NOT assumed to be the opposite
+        partner_gender = self.assign_gender(partner_year_born)
 
-        # Create the partner
         partner = self.create_person(partner_year_born, partner_gender,
                                      is_descendant, original_last_names, parents=None)
 
-        # Link them as partners (bidirectional)
+        # Link the person with the partner
         person.set_partner(partner)
         partner.set_partner(person)
 

@@ -1,7 +1,10 @@
+from collections import deque
+import math
 import random
 from typing import List
 from person import Person
 from person_factory import PersonFactory
+from utils import get_decade_string
 
 
 class FamilyTree:
@@ -34,35 +37,38 @@ class FamilyTree:
 
     def _initialize_original_people(self):
         """Create the first two people born in 1950."""
-        # Create first person (e.g., "Desmond Jones")
+        # Create first person ("Desmond Jones")
         self.original_person1 = self.factory.create_person(
             year_born=1950,
             gender="male",
             is_descendant=False,
-            original_last_names=[],  # Will be set after creation
+            original_last_names=['Jones', 'Smith'],
             parents=None
         )
 
-        # Create second person (e.g., "Molly Smith")
+        # Create second person ("Molly Smith")
         self.original_person2 = self.factory.create_person(
             year_born=1950,
             gender="female",
             is_descendant=False,
-            original_last_names=[],  # Will be set after creation
+            original_last_names=['Jones', 'Smith'],
             parents=None
         )
+
+        # Set names explicitly to ensure they are "Desmond Jones" and "Molly Smith"
+        self.original_person1.set_first_name("Desmond")
+        self.original_person1.set_last_name("Jones")
+        self.original_person2.set_first_name("Molly")
+        self.original_person2.set_last_name("Smith")
 
         # Link them as partners
         self.original_person1.set_partner(self.original_person2)
         self.original_person2.set_partner(self.original_person1)
 
-        # Add to all_people list
-        self.all_people.append(self.original_person1)
-        self.all_people.append(self.original_person2)
+        # Add the original people to the tree
+        self.add_person(self.original_person1)
+        self.add_person(self.original_person2)
 
-        # Track by decade
-        self._add_to_decade(self.original_person1)
-        self._add_to_decade(self.original_person2)
 
     def _add_to_decade(self, person: Person):
         """
@@ -71,8 +77,7 @@ class FamilyTree:
         Args:
             person: Person to add to decade tracking
         """
-        year_born = person.get_year_born()
-        decade = (year_born // 10) * 10
+        decade = get_decade_string(person.get_year_born())
 
         if decade not in self.people_by_decade:
             self.people_by_decade[decade] = []
@@ -89,18 +94,6 @@ class FamilyTree:
         self.all_people.append(person)
         self._add_to_decade(person)
 
-    def get_original_last_names(self) -> List[str]:
-        """
-        Get the last names of the two original people.
-
-        Returns:
-            List of the two original last names
-        """
-        return [
-            self.original_person1.get_last_name(),
-            self.original_person2.get_last_name()
-        ]
-
     def calculate_num_children(self, year_born: int, has_partner: bool) -> int:
         """
         Calculate the number of children a person should have.
@@ -112,29 +105,22 @@ class FamilyTree:
         Returns:
             Number of children (integer)
         """
-        # Determine the decade
-        decade_num = (year_born // 10) * 10
-        decade = f"{decade_num}s"
+        decade = get_decade_string(year_born)
 
-        # Get birth rate for this decade
-        if decade in self.factory.birth_marriage_rates:
-            birth_rate = self.factory.birth_marriage_rates[decade]['birth_rate']
-        else:
-            # Default to 2.0 if decade not found
-            birth_rate = 2.0
+        birth_rate = self.factory.birth_marriage_rates[decade]['birth_rate']
 
         # Apply +/- 1.5 variation
         min_children = birth_rate - 1.5
         max_children = birth_rate + 1.5
 
-        # Round up to get integer bounds
-        min_children = max(0, int(min_children + 0.5))
-        max_children = int(max_children + 0.5)
+        # Round up to get integer bounds and ensure min is not negative
+        min_children = max(0, math.ceil(min_children))
+        max_children = math.ceil(max_children)
 
         # Random number of children within range
         num_children = random.randint(min_children, max_children)
 
-        # CS 562: Single parent has 1 fewer child
+        # Extra requirement for grad student: single parent has 1 fewer child
         if not has_partner:
             num_children = max(0, num_children - 1)
 
@@ -174,19 +160,21 @@ class FamilyTree:
         Generate the complete family tree starting from the two original people.
 
         Uses a queue-based algorithm to process each person and generate their
-        children until no more children can be born or until year 2120.
+        children (and potential spouses of the children) until no more children can be born or until year 2120.
         """
         # Queue of people who can potentially have children
-        # Each entry is a tuple: (person, is_primary_parent)
-        queue = [(self.original_person1, True), (self.original_person2, True)]
+        queue = deque([self.original_person1]) # Only need to process one of the original people since they are partners
         processed = set()  # Track which people have been processed
 
-        original_last_names = self.get_original_last_names()
+        original_last_names = [
+            self.original_person1.get_last_name(),
+            self.original_person2.get_last_name()
+        ]
 
         while queue:
-            person, is_primary_parent = queue.pop(0)
+            person = queue.popleft() # FIFO queue for preserving generational order
 
-            # Skip if already processed
+            # Skip if already processed, reference: https://stackoverflow.com/questions/1252357/is-there-an-object-unique-identifier-in-python
             person_id = id(person)
             if person_id in processed:
                 continue
@@ -196,11 +184,6 @@ class FamilyTree:
             # Check if person has a partner
             partner = person.get_partner()
             has_partner = partner is not None
-
-            # If person has a partner and we're the primary parent, handle children
-            # (to avoid processing the same couple twice)
-            if has_partner and not is_primary_parent:
-                continue
 
             # Determine number of children
             num_children = self.calculate_num_children(person.get_year_born(), has_partner)
@@ -215,16 +198,16 @@ class FamilyTree:
             else:
                 elder_year = person.get_year_born()
 
-            birth_years = self.distribute_birth_years(elder_year, num_children)
+            children_birth_years = self.distribute_birth_years(elder_year, num_children)
 
             # Create each child
-            for birth_year in birth_years:
-                # Stop if birth year exceeds 2120
+            for birth_year in children_birth_years:
+                # Skip if birth year exceeds 2120
                 if birth_year > 2120:
-                    break
+                    continue
 
-                # Randomly assign gender to child
-                child_gender = random.choice(["male", "female"])
+                # Assign a gender based on the gender probability csv
+                child_gender = self.factory.assign_gender(birth_year)
 
                 # Determine parents tuple
                 if has_partner:
@@ -236,7 +219,7 @@ class FamilyTree:
                 child = self.factory.create_person(
                     year_born=birth_year,
                     gender=child_gender,
-                    is_descendant=True,
+                    is_descendant=True, # A child is a direct descendant because they are naturally born into the tree
                     original_last_names=original_last_names,
                     parents=parents
                 )
@@ -254,17 +237,14 @@ class FamilyTree:
                     # Create partner for child
                     child_partner = self.factory.create_partner(
                         child,
-                        is_descendant=False,
-                        original_last_names=original_last_names
+                        is_descendant=False, # A partner is not a direct descendant because they are married into the tree
+                        original_last_names=[] # Partners do not inherit original last names
                     )
                     # Add partner to tree
                     self.add_person(child_partner)
 
-                    # Add partner to queue (but not as primary parent)
-                    queue.append((child_partner, False))
-
-                # Add child to queue for processing
-                queue.append((child, True))
+                # Add child to queue for further processing
+                queue.append(child)
 
     def get_total_count(self) -> int:
         """
