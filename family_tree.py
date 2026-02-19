@@ -241,7 +241,8 @@ class FamilyTree:
                         original_last_names=[] # Partners do not inherit original last names
                     )
                     # Add partner to tree
-                    self.add_person(child_partner)
+                    if child_partner is not None:
+                        self.add_person(child_partner)
 
                 # Add child to queue for further processing
                 queue.append(child)

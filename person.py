@@ -86,7 +86,7 @@ class Person:
         """Set the person's last name."""
         self._last_name = last_name
 
-    def set_partner(self, partner: 'Person') -> None:
+    def set_partner(self, partner: 'Person' | None) -> None:
         """Set the person's partner/spouse."""
         self._partner = partner
 

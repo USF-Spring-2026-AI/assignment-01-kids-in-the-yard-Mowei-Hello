@@ -176,8 +176,7 @@ class PersonFactory:
             The year the person died (life expectancy +/- 10 years)
         """
         # Get life expectancy for the birth year, rounded down to the integer year
-        lookup_year = min(year_born, 2120) # Assuming life expectancy data goes up to 2120, since a partner could be born up to 10 years after the last birth year of 2120
-        expectancy = int(self.life_expectancy[lookup_year])
+        expectancy = int(self.life_expectancy[year_born])
 
         # Add random variation of +/- 10 years
         variation = random.randint(-10, 10)
@@ -291,7 +290,7 @@ class PersonFactory:
         return random.random() < marriage_rate
 
     def create_partner(self, person: Person, is_descendant: bool,
-                      original_last_names: List[str]) -> Person:
+                      original_last_names: List[str]) -> Person | None:
         """
         Create a partner for the given person.
 
@@ -301,10 +300,13 @@ class PersonFactory:
             original_last_names: List of original ancestor last names
 
         Returns:
-            A new Person object as the partner
+            A new Person object as the partner or None if partner cannot be created
         """
         # Partner's birth year is within +/- 10 years
         partner_year_born = person.get_year_born() + random.randint(-10, 10)
+
+        if partner_year_born > 2120: 
+            return None # If the calculated birth year is beyond 2120, we cannot generate a partner due to lack of csv data 
 
         # Partner's gender is NOT assumed to be the opposite
         partner_gender = self.assign_gender(partner_year_born)
