@@ -59,7 +59,7 @@ GPT exposes `--no-gender-probabilities` and `--no-single-parent-reduction` as CL
 **1. Last-name inheritance for children**
 I feel it would make more sense to stick to the direct-descendant parent's last name down the lineage instead of keeping the random selection of the 2 original last-names for every generation down the tree
 
-**3. Switch to `csv.DictReader`**
+**2. Switch to `csv.DictReader`**
 `csv.DictReader` is the preferred way to read CSV files in Python. It makes the column mapping explicit by name instead of positional index, handles quoting and whitespace automatically, and makes the parsing code shorter and easier to maintain across all six `read_*` methods.
 
 ---
